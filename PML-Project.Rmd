@@ -1,0 +1,102 @@
+---
+title: "Pratical Machine Learning - Course Project"
+author: "Tirza Guerra"
+output: html_document
+---
+
+### Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+The goal of this project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set.
+
+This report does not include the process used to generate the files for submission in the website (submission part of the assignment).
+
+### Getting and Cleaning Data
+
+The training data for this project are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+First, we need to load required packages and set the seed, to ensure reproducibility.
+
+```{r}
+library(caret)
+set.seed(12345)
+```
+
+Next step is to read the CSV files.
+
+```{r}
+training <- read.csv("pml-training.csv")
+testing <- read.csv("pml-testing.csv")
+dim(training)
+dim(testing)
+```
+
+Now, we clean the data, by removing columns that have many missing values, near zero variation, or contain only descriptions.
+
+```{r}
+# Remove columns with near zero variance
+nzv <- nearZeroVar(training)
+training <- training[, -nzv]
+testing <- testing[, -nzv]
+
+# Remove columns with more than 40% of missing values
+cnt.NA <- sapply(training, function(x) sum(is.na(x) | x == "") )
+cols.NA <- names(cnt.NA[cnt.NA >= 0.4 * nrow(training)])
+training <- training[, !(names(training) %in% cols.NA)]
+testing <- testing[, !(names(testing) %in% cols.NA)]
+
+# Remove columns that contain only descriptions - not relevant for prediction
+cols.desc <- c("X", "user_name", "raw_timestamp_part_1", "raw_timestamp_part_2", "cvtd_timestamp")
+training <- training[, !(names(training) %in% cols.desc)]
+testing <- testing[, !(names(testing) %in% cols.desc)]
+dim(training)
+dim(testing)
+```
+
+After cleaning, the number of variables is reduced from 160 to 54.
+
+### Splitting Data
+
+Split the training dataset into 2 sets: training & validation, in order to evaluate the chosen prediction model.
+
+```{r}
+intrain <- createDataPartition(training$classe, p = 0.6, list = FALSE)
+train.subset <- training[intrain, ] # training subset
+test.subset <- training[-intrain, ] # validation subset
+dim(train.subset)
+dim(test.subset)
+```
+
+### Model Training
+
+Here, we will use Random Forest as our prediction model.
+
+```{r cache = TRUE}
+mod.fit <- train(classe ~ ., data = train.subset, method = "rf")
+mod.fit
+pred.train <- predict(mod.fit, newdata = test.subset)
+confusionMatrix(pred.train, test.subset$classe)
+```
+
+The confusion matrix indicates that the cross validation accuracy is 99.71%, with an out of sample error estimate of 0.29%. These results show that the model is very good to predict our data.
+
+### Test Set Prediction
+
+Finally, we will use the model to predit the outcomes for the test set.
+
+```{r cache = TRUE}
+pred.test <- predict(mod.fit, newdata = testing)
+pred.test <- as.data.frame(pred.test)
+pred.test
+```
+
+### Conclusion
+
+The Random Forest model performed very well, with great accuracy and small out  of sample error. It produced very precise results, which generated the expected outcomes for the test set.
